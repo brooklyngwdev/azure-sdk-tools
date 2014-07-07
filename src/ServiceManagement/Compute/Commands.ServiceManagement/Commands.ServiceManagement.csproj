@@ -199,7 +199,6 @@
     <Compile Include="IaaS\Network\GetAzureInternalLoadBalancer.cs" />
     <Compile Include="IaaS\Network\GetAzureVNetGatewayDiagnostics.cs" />
     <Compile Include="IaaS\Network\NewAzureInternalLoadBalancerConfig.cs" />
-    <Compile Include="IaaS\Network\NewAzureVPNClientPackage.cs" />
     <Compile Include="IaaS\Network\RemoveAzureInternalLoadBalancer.cs" />
     <Compile Include="IaaS\Network\AddAzureInternalLoadBalancer.cs" />
     <Compile Include="IaaS\Network\RemoveAzurePublicIP.cs" />
