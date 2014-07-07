@@ -22,7 +22,7 @@ namespace Microsoft.WindowsAzure.Commands.ServiceManagement.IaaS
     public class StopAzureVnetGatewayDiagnostics : ServiceManagementBaseCmdlet
     {
         [Parameter(Position = 0, Mandatory = true, HelpMessage = "Virtual network name.")]
-        public string VirtualNetworkName { get; set; }
+        public string VNetName { get; set; }
 
         protected override void OnProcessRecord()
         {
@@ -35,7 +35,7 @@ namespace Microsoft.WindowsAzure.Commands.ServiceManagement.IaaS
             ExecuteClientActionNewSM(
                 null,
                 this.CommandRuntime.ToString(),
-                () => this.NetworkClient.Gateways.UpdateDiagnostics(VirtualNetworkName, parameters));
+                () => this.NetworkClient.Gateways.UpdateDiagnostics(VNetName, parameters));
         }
     }
 }

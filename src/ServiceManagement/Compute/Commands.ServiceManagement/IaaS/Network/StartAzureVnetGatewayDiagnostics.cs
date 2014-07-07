@@ -22,7 +22,7 @@ namespace Microsoft.WindowsAzure.Commands.ServiceManagement.IaaS
     public class StartAzureVnetGatewayDiagnostics : ServiceManagementBaseCmdlet
     {
         [Parameter(Position = 0, Mandatory = true, HelpMessage = "Virtual network name.")]
-        public string VirtualNetworkName { get; set; }
+        public string VNetName { get; set; }
 
         [Parameter(Position = 1, Mandatory = true, HelpMessage = "The duration of the capture in seconds (between 1 and 300)")]
         public int CaptureDurationInSeconds { get; set; }
@@ -51,7 +51,7 @@ namespace Microsoft.WindowsAzure.Commands.ServiceManagement.IaaS
             ExecuteClientActionNewSM(
                 null,
                 this.CommandRuntime.ToString(),
-                () => this.NetworkClient.Gateways.UpdateDiagnostics(VirtualNetworkName, parameters));
+                () => this.NetworkClient.Gateways.UpdateDiagnostics(VNetName, parameters));
         }
     }
 }

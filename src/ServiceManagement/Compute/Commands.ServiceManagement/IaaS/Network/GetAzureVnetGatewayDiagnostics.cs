@@ -16,26 +16,33 @@ namespace Microsoft.WindowsAzure.Commands.ServiceManagement.IaaS.Network
 {
     using System.Management.Automation;
     using Management.Network.Models;
+    using Model;
     using Utilities.Common;
 
     [Cmdlet(VerbsCommon.Get, "AzureVNetGatewayDiagnostics"), OutputType(typeof(ManagementOperationContext))]
     public class GetAzureVnetGatewayDiagnostics : ServiceManagementBaseCmdlet
     {
         [Parameter(Position = 0, Mandatory = true, HelpMessage = "Virtual network name.")]
-        public string VirtualNetworkName { get; set; }
+        public string VNetName { get; set; }
 
         protected override void OnProcessRecord()
         {
-            UpdateGatewayPublicDiagnostics parameters = new UpdateGatewayPublicDiagnostics()
-            {
-                Operation = UpdateGatewayPublicDiagnosticsOperation.StopDiagnostics,
-            };
-
             ServiceManagementProfile.Initialize();
             ExecuteClientActionNewSM(
                 null,
                 this.CommandRuntime.ToString(),
-                () => this.NetworkClient.Gateways.UpdateDiagnostics(VirtualNetworkName, parameters));
+                () => this.NetworkClient.Gateways.GetDiagnostics(VNetName),
+                (OperationStatusResponse operation, GatewayDiagnosticsStatus status) =>
+                {
+                    return new VirtualNetworkDiagnosticsContext()
+                    {
+                        OperationId = operation.Id,
+                        OperationStatus = operation.Status.ToString(),
+                        OperationDescription = this.CommandRuntime.ToString(),
+                        DiagnosticsUrl = status.DiagnosticsUrl,
+                        State = status.State,
+                    };
+                });
         }
     }
 }
