@@ -20,7 +20,7 @@ namespace Microsoft.WindowsAzure.Commands.ServiceManagement.IaaS.Network
     using Utilities.Common;
 
     [Cmdlet(VerbsCommon.Get, "AzureVNetGatewayDiagnostics"), OutputType(typeof(ManagementOperationContext))]
-    public class GetAzureVnetGatewayDiagnostics : ServiceManagementBaseCmdlet
+    public class GetAzureVNetGatewayDiagnostics : ServiceManagementBaseCmdlet
     {
         [Parameter(Position = 0, Mandatory = true, HelpMessage = "Virtual network name.")]
         public string VNetName { get; set; }

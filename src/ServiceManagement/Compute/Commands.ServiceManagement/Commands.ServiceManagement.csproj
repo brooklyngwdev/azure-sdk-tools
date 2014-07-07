@@ -197,7 +197,7 @@
     <Compile Include="IaaS\Extensions\MicrosoftAntimalware\VirtualMachineMicrosoftAntimalwareExtensionCmdletBase.cs" />
     <Compile Include="IaaS\Extensions\MicrosoftAntimalware\VirtualMachineMicrosoftAntimalwareExtensionContext.cs" />
     <Compile Include="IaaS\Network\GetAzureInternalLoadBalancer.cs" />
-    <Compile Include="IaaS\Network\GetAzureVnetGatewayDiagnostics.cs" />
+    <Compile Include="IaaS\Network\GetAzureVNetGatewayDiagnostics.cs" />
     <Compile Include="IaaS\Network\NewAzureInternalLoadBalancerConfig.cs" />
     <Compile Include="IaaS\Network\NewAzureVPNClientPackage.cs" />
     <Compile Include="IaaS\Network\RemoveAzureInternalLoadBalancer.cs" />
