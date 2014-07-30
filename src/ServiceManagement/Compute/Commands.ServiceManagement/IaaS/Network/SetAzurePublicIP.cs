@@ -28,6 +28,10 @@ namespace Microsoft.WindowsAzure.Commands.ServiceManagement.IaaS
         [ValidateNotNullOrEmpty]
         public string PublicIPName { get; set; }
 
+        [Parameter(Position = 2, Mandatory = false, HelpMessage = "Idle Timeout.")]
+        [ValidateNotNullOrEmpty]
+        public int? IdleTimeoutInMinutes { get; set; }
+
         protected override void ProcessRecord()
         {
             base.ProcessRecord();
@@ -46,17 +50,29 @@ namespace Microsoft.WindowsAzure.Commands.ServiceManagement.IaaS
             if (networkConfiguration.PublicIPs.Any())
             {
                 networkConfiguration.PublicIPs.First().Name = this.PublicIPName;
+                if (this.ParameterSpecified("IdleTimeoutInMinutes"))
+                {
+                    networkConfiguration.PublicIPs.First().IdleTimeoutInMinutes = this.IdleTimeoutInMinutes;
+                }
             }
             else
             {
                 networkConfiguration.PublicIPs.Add(
                     new AssignPublicIP
                     {
-                        Name = this.PublicIPName
+                        Name = this.PublicIPName,
+                        IdleTimeoutInMinutes = this.ParameterSpecified("IdleTimeoutInMinutes") ? this.IdleTimeoutInMinutes : null,
                     });
             }
 
             WriteObject(VM);
+        }
+        
+        private bool ParameterSpecified(string parameterName)
+        {
+            // Check for parameters by name so we can tell the difference between 
+            // the user not specifying them, and the user specifying null/empty.
+            return this.MyInvocation.BoundParameters.ContainsKey(parameterName);
         }
     }
 }
