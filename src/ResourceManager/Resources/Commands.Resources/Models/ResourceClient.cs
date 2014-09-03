@@ -14,12 +14,12 @@
 
 using Microsoft.Azure.Management.Resources;
 using Microsoft.Azure.Management.Resources.Models;
+using Microsoft.WindowsAzure;
 using Microsoft.WindowsAzure.Commands.Common.Storage;
 using Microsoft.WindowsAzure.Commands.Utilities.Common;
 using Microsoft.WindowsAzure.Management.Monitoring.Events;
 using Microsoft.WindowsAzure.Management.Storage;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -133,6 +133,11 @@ namespace Microsoft.Azure.Commands.Resources.Models
                 });
         }
 
+        public virtual void UnregisterProvider(string RPName)
+        {
+            ResourceManagementClient.Providers.Unregister(RPName);
+        }
+        
         private Uri GetTemplateUri(string templateFile, string galleryTemplateName, string storageAccountName)
         {
             Uri templateFileUri;
@@ -185,15 +190,16 @@ namespace Microsoft.Azure.Commands.Resources.Models
             return storageName;
         }
 
-        private ResourceGroup CreateResourceGroup(string name, string location)
+        private ResourceGroup CreateOrUpdateResourceGroup(string name, string location, Hashtable[] tags)
         {
+            Dictionary<string, string> tagDictionary = TagsConversionHelper.CreateTagDictionary(tags, validate: true);
+
             var result = ResourceManagementClient.ResourceGroups.CreateOrUpdate(name,
                 new BasicResourceGroup
                 {
-                    Location = location
+                    Location = location,
+                    Tags = tagDictionary
                 });
-
-            WriteVerbose(string.Format("Create resource group '{0}' in location '{1}'", name, location));
 
             return result.ResourceGroup;
         }
@@ -232,8 +238,8 @@ namespace Microsoft.Azure.Commands.Resources.Models
         {
             const string normalStatusFormat = "Resource {0} '{1}' provisioning status is {2}";
             const string failureStatusFormat = "Resource {0} '{1}' failed with message '{2}'";
-            List<DeploymentOperation> newOperations = new List<DeploymentOperation>();
-            DeploymentOperationsListResult result = null;
+            List<DeploymentOperation> newOperations;
+            DeploymentOperationsListResult result;
             
             do
             {
@@ -245,7 +251,7 @@ namespace Microsoft.Azure.Commands.Resources.Models
 
             foreach (DeploymentOperation operation in newOperations)
             {
-                string statusMessage = string.Empty;
+                string statusMessage;
 
                 if (operation.Properties.ProvisioningState != ProvisioningState.Failed)
                 {
@@ -272,31 +278,14 @@ namespace Microsoft.Azure.Commands.Resources.Models
 
         public static string ParseErrorMessage(string statusMessage)
         {
-            try
+            CloudError error = CloudException.ParseXmlOrJsonError(statusMessage);
+            if (error.Message == null)
             {
-                if (JsonUtilities.IsJson(statusMessage))
-                {
-                    JObject statusMessageJson = JObject.Parse(statusMessage);
-                    if (statusMessageJson.GetValue("message", StringComparison.CurrentCultureIgnoreCase) != null)
-                    {
-                        return statusMessageJson.GetValue("message", StringComparison.CurrentCultureIgnoreCase).ToString();
-                    }
-                    else if (statusMessageJson.GetValue("error", StringComparison.CurrentCultureIgnoreCase) != null)
-                    {
-                        JObject errorToken = statusMessageJson.GetValue("error", StringComparison.CurrentCultureIgnoreCase) as JObject;
-                        return errorToken.GetValue("message", StringComparison.CurrentCultureIgnoreCase).ToString();
-                    }
-                }
-                else if (XmlUtilities.IsXml(statusMessage))
-                {
-                    return XmlUtilities.DeserializeXmlString<ResourceManagementError>(statusMessage).Message;
-                }
-
-                return statusMessage;
+                return error.OriginalMessage;
             }
-            catch
+            else
             {
-                return statusMessage;
+                return error.Message;
             }
         }
 
@@ -307,7 +296,7 @@ namespace Microsoft.Azure.Commands.Resources.Models
             Action<string, string, BasicDeployment> job,
             params string[] status)
         {
-            Deployment deployment = new Deployment();
+            Deployment deployment;
 
             do
             {
@@ -348,10 +337,10 @@ namespace Microsoft.Azure.Commands.Resources.Models
 
         private BasicDeployment CreateBasicDeployment(ValidatePSResourceGroupDeploymentParameters parameters)
         {
-            BasicDeployment deployment = new BasicDeployment()
+            BasicDeployment deployment = new BasicDeployment
             {
                 Mode = DeploymentMode.Incremental,
-                TemplateLink = new TemplateLink()
+                TemplateLink = new TemplateLink
                 {
                     Uri = GetTemplateUri(parameters.TemplateFile, parameters.GalleryTemplateIdentity, parameters.StorageAccountName),
                     ContentVersion = parameters.TemplateVersion
@@ -362,26 +351,14 @@ namespace Microsoft.Azure.Commands.Resources.Models
             return deployment;
         }
 
-        private List<ResourceManagementError> CheckBasicDeploymentErrors(string resourceGroup, string deploymentName, BasicDeployment deployment)
+        private TemplateValidationInfo CheckBasicDeploymentErrors(string resourceGroup, string deploymentName, BasicDeployment deployment)
         {
-            List<ResourceManagementError> errors = new List<ResourceManagementError>();
             DeploymentValidateResponse validationResult = ResourceManagementClient.Deployments.Validate(
                 resourceGroup,
                 deploymentName,
                 deployment);
-            if (!validationResult.IsValid)
-            {
-                if (validationResult.Error != null)
-                {
-                    errors.Add(validationResult.Error);
-                    if (validationResult.Error.Details != null && validationResult.Error.Details.Count > 0)
-                    {
-                        errors.AddRange(validationResult.Error.Details);
-                    }
-                }
-            }
 
-            return errors;
+            return new TemplateValidationInfo(validationResult);
         }
     }
 }

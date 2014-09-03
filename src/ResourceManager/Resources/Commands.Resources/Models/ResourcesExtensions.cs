@@ -12,6 +12,8 @@
 // limitations under the License.
 // ----------------------------------------------------------------------------------
 
+using System.Collections;
+using Microsoft.Azure.Commands.Tags.Model;
 using Microsoft.Azure.Gallery;
 using Microsoft.Azure.Management.Resources.Models;
 using Microsoft.WindowsAzure.Commands.Utilities.Common;
@@ -31,13 +33,13 @@ namespace Microsoft.Azure.Commands.Resources.Models
         {
             List<PSResource> resources = client.FilterResources(new FilterResourcesOptions { ResourceGroup = resourceGroup.Name })
                 .Select(r => r.ToPSResource(client)).ToList();
-            return new PSResourceGroup()
+            return new PSResourceGroup
             {
                 ResourceGroupName = resourceGroup.Name,
                 Location = resourceGroup.Location,
                 Resources = resources,
-                ResourcesTable = ConstructResourcesTable(resources),
-                ProvisioningState = resourceGroup.ProvisioningState
+                ProvisioningState = resourceGroup.ProvisioningState,
+                Tags = TagsConversionHelper.CreateTagHashtable(resourceGroup.Tags),
             };
         }
 
@@ -47,19 +49,7 @@ namespace Microsoft.Azure.Commands.Resources.Models
 
             if (result != null)
             {
-                deployment = CreatePSResourceGroupDeployment(result.Deployment.DeploymentName, resourceGroup, result.Deployment.Properties);
-            }
-
-            return deployment;
-        }
-
-        public static PSResourceGroupDeployment ToPSResourceGroupDeployment(this DeploymentOperationsCreateResult result)
-        {
-            PSResourceGroupDeployment deployment = new PSResourceGroupDeployment();
-
-            if (result != null)
-            {
-                deployment = CreatePSResourceGroupDeployment(result.Name, result.ResourceGroup, result.Properties);
+                deployment = CreatePSResourceGroupDeployment(result.Deployment.Name, resourceGroup, result.Deployment.Properties);
             }
 
             return deployment;
@@ -71,7 +61,7 @@ namespace Microsoft.Azure.Commands.Resources.Models
 
             if (result != null)
             {
-                deployment = CreatePSResourceGroupDeployment(result.DeploymentName, resourceGroup, result.Properties);
+                deployment = CreatePSResourceGroupDeployment(result.Name, resourceGroup, result.Properties);
             }
 
             return deployment;
@@ -89,7 +79,7 @@ namespace Microsoft.Azure.Commands.Resources.Models
         public static PSResource ToPSResource(this Resource resource, ResourcesClient client)
         {
             ResourceIdentifier identifier = new ResourceIdentifier(resource.Id);
-            return new PSResource()
+            return new PSResource
             {
                 Name = identifier.ResourceName,
                 Location = resource.Location,
@@ -97,7 +87,8 @@ namespace Microsoft.Azure.Commands.Resources.Models
                 ResourceGroupName = identifier.ResourceGroupName,
                 ParentResource = identifier.ParentResource,
                 Properties = JsonUtilities.DeserializeJson(resource.Properties),
-                PropertiesText = resource.Properties
+                PropertiesText = resource.Properties,
+                Tags = TagsConversionHelper.CreateTagHashtable(resource.Tags)
             };
         }
 
@@ -199,7 +190,7 @@ namespace Microsoft.Azure.Commands.Resources.Models
             return psObject;
         }
 
-        private static string ConstructResourcesTable(List<PSResource> resources)
+        public static string ConstructResourcesTable(List<PSResource> resources)
         {
             StringBuilder resourcesTable = new StringBuilder();
 
@@ -226,22 +217,77 @@ namespace Microsoft.Azure.Commands.Resources.Models
             return resourcesTable.ToString();
         }
 
-        private static string ToString(TemplateLink templateLink)
+        public static string ConstructTagsTable(Hashtable[] tags)
         {
+            if (tags == null)
+            {
+                return null;
+            }
+
+            Hashtable emptyHashtable = new Hashtable
+                {
+                    {"Name", string.Empty},
+                    {"Value", string.Empty}
+                };
+            StringBuilder resourcesTable = new StringBuilder();
+
+            if (tags.Length > 0)
+            {
+                int maxNameLength = Math.Max("Name".Length, tags.Where(ht => ht.ContainsKey("Name")).DefaultIfEmpty(emptyHashtable).Max(ht => ht["Name"].ToString().Length));
+                int maxValueLength = Math.Max("Value".Length, tags.Where(ht => ht.ContainsKey("Value")).DefaultIfEmpty(emptyHashtable).Max(ht => ht["Value"].ToString().Length));
+
+                string rowFormat = "{0, -" + maxNameLength + "}  {1, -" + maxValueLength + "}\r\n";
+                resourcesTable.AppendLine();
+                resourcesTable.AppendFormat(rowFormat, "Name", "Value");
+                resourcesTable.AppendFormat(rowFormat,
+                    GeneralUtilities.GenerateSeparator(maxNameLength, "="),
+                    GeneralUtilities.GenerateSeparator(maxValueLength, "="));
+
+                foreach (Hashtable tag in tags)
+                {
+                    PSTagValuePair tagValuePair = TagsConversionHelper.Create(tag);
+                    if (tagValuePair != null)
+                    {
+                        if (tagValuePair.Name.StartsWith(TagsClient.ExecludedTagPrefix))
+                        {
+                            continue;
+                        }
+
+                        if (tagValuePair.Value == null)
+                        {
+                            tagValuePair.Value = string.Empty;
+                        }
+                        resourcesTable.AppendFormat(rowFormat, tagValuePair.Name, tagValuePair.Value);
+                    }
+                }
+            }
+
+            return resourcesTable.ToString();
+        }
+
+        private static string ConstructTemplateLinkView(TemplateLink templateLink)
+        {
+            if (templateLink == null)
+            {
+                return string.Empty;
+            }
+
             StringBuilder result = new StringBuilder();
 
-            if (templateLink != null)
-            {
-                result.AppendLine();
-                result.AppendLine(string.Format("{0, -15}: {1}", "Uri", templateLink.Uri));
-                result.AppendLine(string.Format("{0, -15}: {1}", "ContentVersion", templateLink.ContentVersion));
-            }
+            result.AppendLine();
+            result.AppendLine(string.Format("{0, -15}: {1}", "Uri", templateLink.Uri));
+            result.AppendLine(string.Format("{0, -15}: {1}", "ContentVersion", templateLink.ContentVersion));
 
             return result.ToString();
         }
 
-        private static string ToString(Dictionary<string, DeploymentVariable> dictionary)
+        public static string ConstructDeploymentVariableTable(Dictionary<string, DeploymentVariable> dictionary)
         {
+            if (dictionary == null)
+            {
+                return null;
+            }
+
             StringBuilder result = new StringBuilder();
 
             if (dictionary.Count > 0)
@@ -258,6 +304,7 @@ namespace Microsoft.Azure.Commands.Resources.Models
             }
 
             return result.ToString();
+
         }
 
         private static PSResourceGroupDeployment CreatePSResourceGroupDeployment(
@@ -265,8 +312,6 @@ namespace Microsoft.Azure.Commands.Resources.Models
             string gesourceGroup,
             DeploymentProperties properties)
         {
-            Dictionary<string, DeploymentVariable> outputs = new Dictionary<string, DeploymentVariable>();
-            Dictionary<string, DeploymentVariable> parameters = new Dictionary<string, DeploymentVariable>();
             PSResourceGroupDeployment deploymentObject = new PSResourceGroupDeployment();
 
             deploymentObject.DeploymentName = name;
@@ -282,21 +327,19 @@ namespace Microsoft.Azure.Commands.Resources.Models
 
                 if (!string.IsNullOrEmpty(properties.Outputs))
                 {
-                    outputs = JsonConvert.DeserializeObject<Dictionary<string, DeploymentVariable>>(properties.Outputs);
+                    Dictionary<string, DeploymentVariable> outputs = JsonConvert.DeserializeObject<Dictionary<string, DeploymentVariable>>(properties.Outputs);
                     deploymentObject.Outputs = outputs;
-                    deploymentObject.OutputsString = ToString(outputs);
                 }
 
                 if (!string.IsNullOrEmpty(properties.Parameters))
                 {
-                    parameters = JsonConvert.DeserializeObject<Dictionary<string, DeploymentVariable>>(properties.Parameters);
+                    Dictionary<string, DeploymentVariable> parameters = JsonConvert.DeserializeObject<Dictionary<string, DeploymentVariable>>(properties.Parameters);
                     deploymentObject.Parameters = parameters;
-                    deploymentObject.ParametersString = ToString(parameters);
                 }
 
                 if (properties.TemplateLink != null)
                 {
-                    deploymentObject.TemplateLinkString = ToString(properties.TemplateLink);
+                    deploymentObject.TemplateLinkString = ConstructTemplateLinkView(properties.TemplateLink);
                 }
             }
 
@@ -321,7 +364,7 @@ namespace Microsoft.Azure.Commands.Resources.Models
         {
             get
             {
-                return new PSResource()
+                return new PSResource
                 {
                     Name = string.Empty,
                     Location = string.Empty,
