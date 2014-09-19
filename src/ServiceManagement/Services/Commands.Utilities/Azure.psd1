@@ -81,6 +81,7 @@ NestedModules = '.\Services\Microsoft.WindowsAzure.Commands.dll',
                 '.\Sql\Microsoft.WindowsAzure.Commands.SqlDatabase.dll',
                 '.\Storage\Microsoft.WindowsAzure.Commands.Storage.dll',
                 '.\ManagedCache\Microsoft.Azure.Commands.ManagedCache.dll',
+                '.\Network\Microsoft.Azure.Commands.Network.dll',
                 '.\HDInsight\Microsoft.WindowsAzure.Commands.HDInsight.dll'
 
 # Functions to export from this module
